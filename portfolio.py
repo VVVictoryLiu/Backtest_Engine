@@ -3,7 +3,6 @@
 
 # portfolio.py
 
-from __future__ import print_function
 
 import datetime
 from math import floor
@@ -122,7 +121,7 @@ class Portfolio():
 
         for s in self.symbol_list:
             # Approximation to the real value
-            market_value = self.current_positions[s] * self.bars.get_latest_bar_value(s, "adj_close")
+            market_value = self.current_positions[s] * self.bars.get_latest_bar_value(s, "close")
             dh[s] = market_value
             dh['total'] += market_value
 
@@ -166,15 +165,26 @@ class Portfolio():
         if fill.direction == 'SELL':
             fill_dir = -1
 
-        # Update holdings list with new quantities
+        # 这里以收盘价作为购买成本
         fill_cost = self.bars.get_latest_bar_value(
-            fill.symbol, "adj_close"
+            fill.symbol, "close"
         )
+        #购买成本/卖出收益
         cost = fill_dir * fill_cost * fill.quantity
         self.current_holdings[fill.symbol] += cost
-        self.current_holdings['commission'] += fill.commission
-        self.current_holdings['cash'] -= (cost + fill.commission)
-        self.current_holdings['total'] -= (cost + fill.commission)
+        commission = self.calcu_commission(fill_cost,fill.quantity,fill_dir)
+        self.current_holdings['commission'] = commission
+        self.current_holdings['cash'] -= (cost + commission)
+
+        #总成本在Market 事件中计算
+        #self.current_holdings['total'] -= (cost + commission)
+
+    def calcu_commission(self,fill_cost,fill_quantity,fill_dir):
+        if fill_dir == 1:
+            return max(5,fill_cost * fill_quantity*0.0015)
+        else: #卖出时增收印花税
+            return max(5,fill_cost * fill_quantity*0.0025)
+
 
     def update_fill(self, event):
         """
@@ -187,12 +197,7 @@ class Portfolio():
 
     def generate_naive_order(self, signal):
         """
-        Simply files an Order object as a constant quantity
-        sizing of the signal object, without risk management or
-        position sizing considerations.
-
-        Parameters:
-        signal - The tuple containing Signal information.
+        一个简单的买卖策略，按照固定数量买，全部持仓卖
         """
         order = None
 
@@ -200,10 +205,11 @@ class Portfolio():
         direction = signal.signal_type
         strength = signal.strength
 
-        mkt_quantity = 100
+        mkt_quantity = 10000
         cur_quantity = self.current_positions[symbol]
         order_type = 'MKT'
 
+        # 按mkt_quantity买进，按全部卖出
         if direction == 'LONG' and cur_quantity == 0:
             order = OrderEvent(symbol, order_type, mkt_quantity, 'BUY')
         if direction == 'SHORT' and cur_quantity == 0:

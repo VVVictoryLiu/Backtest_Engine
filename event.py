@@ -3,22 +3,16 @@
 
 # event.py
 
-from __future__ import print_function
 
 
 class Event(object):
-    """
-    Event is base class providing an interface for all subsequent 
-    (inherited) events, that will trigger further events in the 
-    trading infrastructure.   
-    """
+
     pass
 
 
 class MarketEvent(Event):
     """
-    Handles the event of receiving a new market update with 
-    corresponding bars.
+    Markt事件，该事件在通过DataHandle.update_bars方法获取每日数据后生成
     """
 
     def __init__(self):
@@ -30,21 +24,18 @@ class MarketEvent(Event):
 
 class SignalEvent(Event):
     """
-    Handles the event of sending a Signal from a Strategy object.
-    This is received by a Portfolio object and acted upon.
+    信号事件，回测策略触发该事件，触发于market事件之后
     """
     
     def __init__(self, strategy_id, symbol, datetime, signal_type, strength):
         """
-        Initialises the SignalEvent.
+        参数：
 
-        Parameters:
-        strategy_id - The unique ID of the strategy sending the signal.
-        symbol - The ticker symbol, e.g. 'GOOG'.
-        datetime - The timestamp at which the signal was generated.
-        signal_type - 'LONG' or 'SHORT'.
-        strength - An adjustment factor "suggestion" used to scale 
-            quantity at the portfolio level. Useful for pairs strategies.
+        strategy_id 一个用于唯一识别事件的ID
+        symbol 股票名或代码
+        datetime 时间戳
+        signal_type - 'LONG' or 'SHORT'，空头或多头
+        strength - 强度指标，用于配对交易
         """
         self.strategy_id = strategy_id
         self.type = 'SIGNAL'
@@ -132,22 +123,21 @@ class FillEvent(Event):
         self.quantity = quantity
         self.direction = direction
         self.fill_cost = fill_cost
+        self.commission = None
 
-        # Calculate commission
+        '''
+        
+        更新交易费用在portfolio.py中统一计算，以更好模拟A股实际
+        
+        
         if commission is None:
             self.commission = self.calculate_ib_commission()
         else:
             self.commission = commission
-
+        
     def calculate_ib_commission(self):
         """
-        Calculates the fees of trading based on an Interactive
-        Brokers fee structure for API, in USD.
-
-        This does not include exchange or ECN fees.
-
-        Based on "US API Directed Orders":
-        https://www.interactivebrokers.com/en/index.php?f=commission&p=stocks2
+        买卖手续费计算
         """
         full_cost = 1.3
         if self.quantity <= 500:
@@ -155,3 +145,4 @@ class FillEvent(Event):
         else: # Greater than 500
             full_cost = max(1.3, 0.008 * self.quantity)
         return full_cost
+        '''
